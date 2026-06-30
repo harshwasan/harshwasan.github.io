@@ -497,6 +497,7 @@ const UNIVERSE=[
  {s:'LCID',base:3.1,drift:-0.16,volat:3.2,seed:97,volM:45}
 ];
 const NAMES={NVDA:'NVIDIA',AAPL:'Apple',MSFT:'Microsoft',TSLA:'Tesla',AMZN:'Amazon',META:'Meta',INTC:'Intel',RIVN:'Rivian',LCID:'Lucid'};
+const STOCK_API_URL='https://harsh-stock-price-worker.harshwasan2.workers.dev';
 async function fetchYahoo(sym){
   const y='https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'?range=3mo&interval=1d';
   const urls=['https://api.allorigins.win/raw?url='+encodeURIComponent(y),'https://corsproxy.io/?url='+encodeURIComponent(y),y];
@@ -504,15 +505,28 @@ async function fetchYahoo(sym){
     try{
     const res=await fetch(u,{signal:ctl.signal,cache:'no-store'});if(!res.ok)throw Error('bad response');
     const j=await res.json(),r=j&&j.chart&&j.chart.result&&j.chart.result[0];if(!r)throw Error('missing chart');
-    const q=r.indicator.quote[0];const closes=(q.close||[]).filter(x=>x!=null);const vols=(q.volume||[]).filter(x=>x!=null);
+    const q=r.indicators.quote[0];const closes=(q.close||[]).filter(x=>x!=null);const vols=(q.volume||[]).filter(x=>x!=null);
     if(closes.length<50)throw Error('short series');const last=(r.meta&&r.meta.regularMarketPrice)||closes[closes.length-1];
     const avgVol=vols.length?vols.reduce((a,b)=>a+b,0)/vols.length:0;return{closes:closes.slice(-60),last,avgVol,live:true};
     }finally{clearTimeout(to);}
   };
   try{return await Promise.any(urls.map(read));}catch(e){return null;}
 }
+async function fetchStockWorker(symbols){
+  if(!STOCK_API_URL)return null;
+  try{
+    const endpoint=STOCK_API_URL.replace(/\/$/,'')+'/quotes?symbols='+encodeURIComponent(symbols.join(','));
+    const res=await fetch(endpoint,{cache:'no-store'});
+    if(!res.ok)throw Error('worker '+res.status);
+    const body=await res.json();
+    const bySymbol={};
+    (body.results||[]).forEach(x=>bySymbol[x.symbol]=x);
+    return{bySymbol,source:body.source||'Cloudflare Worker',cache:res.headers.get('X-Stock-Cache')||''};
+  }catch(e){return null;}
+}
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function buildFallback(st){const rng=mulberry32(st.seed),out=[st.base];for(let i=1;i<60;i++){const noise=(rng()-0.5)*2*st.volat/100;out.push(+(out[i-1]*(1+st.drift/100+noise)).toFixed(2));}return{closes:out,last:out[out.length-1],avgVol:st.volM*1e6,live:false};}
+function applyMarketData(row,data){row.st.closes=data.closes;row.st.last=data.last;row.st.avgVol=data.avgVol;row.st.live=data.live;row.tr.children[1].textContent='$'+row.st.last.toFixed(2);}
 function ema(s,p){const k=2/(p+1);let e=s[0];for(let i=1;i<s.length;i++)e=s[i]*k+e*(1-k);return e;}
 function rsiCalc(p,period=14){let g=0,l=0;for(let i=1;i<=period;i++){const d=p[i]-p[i-1];d>=0?g+=d:l-=d;}let ag=g/period,al=l/period;for(let i=period+1;i<p.length;i++){const d=p[i]-p[i-1];ag=(ag*(period-1)+Math.max(d,0))/period;al=(al*(period-1)+Math.max(-d,0))/period;}const rs=al===0?100:ag/al;return 100-100/(1+rs);}
 function metrics(p){return{last:p[p.length-1],ema13:ema(p,13),ema50:ema(p,50),rsi:rsiCalc(p,14)};}
@@ -533,16 +547,29 @@ function drawChart(series,color){const cv=document.getElementById('chart');const
 async function runEngine(){
   if(engRunning)return;engRunning=true;runBtn.disabled=true;resTag.textContent='';stagesEls.forEach(e=>e.classList.remove('active','done'));statusEl.textContent='running…';statusEl.style.color='var(--acc)';
   const t0=performance.now();const rows=[],rejected=[];
-  setStage(0,'active');mc('starting parallel Yahoo Finance requests for '+UNIVERSE.length+' symbols…','i');tbody.innerHTML='';let liveCount=0;
-  const fetchJobs=UNIVERSE.map(async st=>{
+  setStage(0,'active');mc('starting stock data request for '+UNIVERSE.length+' symbols…','i');tbody.innerHTML='';let liveCount=0;
+  UNIVERSE.forEach(st=>{
     const tr=document.createElement('tr');tr.className='row';tr.innerHTML=`<td class="sym">${st.s}</td><td>fetching…</td><td>—</td><td>—</td><td>—</td><td>—</td>`;tbody.appendChild(tr);requestAnimationFrame(()=>tr.classList.add('in'));
-    mcAdd('↳ fetching live price from Yahoo Finance for '+(NAMES[st.s]||st.s)+' ('+st.s+')…','i');
-    const liveData=await fetchYahoo(st.s),data=liveData||buildFallback(st);st.closes=data.closes;st.last=data.last;st.avgVol=data.avgVol;st.live=data.live;if(data.live)liveCount++;
-    tr.children[1].textContent='$'+st.last.toFixed(2);
-    mcAdd((data.live?'✓ ':'↳ ')+st.s+' '+(data.live?'live price $'+st.last.toFixed(2)+' · '+st.closes.length+' daily closes':'using sample fallback · browser source blocked'),data.live?'ok':'w');
-    return{st,tr};
+    rows.push({st,tr});
   });
-  rows.push(...await Promise.all(fetchJobs));
+  const workerBatch=await fetchStockWorker(UNIVERSE.map(st=>st.s));
+  if(workerBatch){
+    mcAdd('✓ Cloudflare Worker responded'+(workerBatch.cache?' · cache '+workerBatch.cache:''),'ok');
+    for(const row of rows){
+      const liveData=workerBatch.bySymbol[row.st.s],data=liveData&&liveData.live?liveData:buildFallback(row.st);
+      applyMarketData(row,data);if(data.live)liveCount++;
+      mcAdd((data.live?'✓ ':'↳ ')+row.st.s+' '+(data.live?'live price $'+row.st.last.toFixed(2)+' · '+row.st.closes.length+' daily closes':'using sample fallback · worker source unavailable'),data.live?'ok':'w');
+    }
+  }else{
+    mcAdd('↳ Worker URL not configured yet; trying browser fetch paths…','w');
+    const fetchJobs=rows.map(async row=>{
+      mcAdd('↳ fetching live price from Yahoo Finance for '+(NAMES[row.st.s]||row.st.s)+' ('+row.st.s+')…','i');
+      const liveData=await fetchYahoo(row.st.s),data=liveData||buildFallback(row.st);
+      applyMarketData(row,data);if(data.live)liveCount++;
+      mcAdd((data.live?'✓ ':'↳ ')+row.st.s+' '+(data.live?'live price $'+row.st.last.toFixed(2)+' · '+row.st.closes.length+' daily closes':'using sample fallback · browser source blocked'),data.live?'ok':'w');
+    });
+    await Promise.all(fetchJobs);
+  }
   const src=liveCount===UNIVERSE.length?'live Yahoo Finance data ✓':liveCount>0?liveCount+'/'+UNIVERSE.length+' live · rest sample':'sample data — Yahoo blocked from here';
   mcAdd('✓ fetched '+UNIVERSE.length+' symbols · '+src,'ok');setStage(0,'done');await sleep(180);
   setStage(1,'active');mcAdd('screening avg daily $ volume ≥ $500M…','i');await sleep(180);let kept=[];
