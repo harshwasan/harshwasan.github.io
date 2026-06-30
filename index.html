@@ -261,7 +261,7 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
 
 <div class="minibar">
   <span class="b" onclick="scrollTo({top:0,behavior:'smooth'})"><span class="d"></span>Harsh Wasan — Automation Engineer</span>
-  <span class="lk"><a href="#automation">automation</a><a href="#proof">proof</a><a href="#projects">projects</a><a href="#contact">contact</a></span>
+  <span class="lk"><a href="#proof">featured proof</a><a href="#case-study">case study</a><a href="#projects">projects</a><a href="#contact">contact</a></span>
 </div>
 
 <div class="shell">
@@ -272,14 +272,13 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
     <p class="blurb">I build backend automations that reduce repetitive operational work across market data, SQL workflows, alerts and internal tooling.</p>
     <nav class="nav">
       <a href="#about" class="on"><span class="bar"></span>About</a>
-      <a href="#automation"><span class="bar"></span>Market demo</a>
-      <a href="#roi"><span class="bar"></span>ROI estimator</a>
-      <a href="#work"><span class="bar"></span>Experience</a>
-      <a href="#proof"><span class="bar"></span>Proof</a>
-      <a href="#safety"><span class="bar"></span>Safety</a>
-      <a href="#projects"><span class="bar"></span>Projects</a>
+      <a href="#proof"><span class="bar"></span>Featured proof</a>
       <a href="#case-study"><span class="bar"></span>Case study</a>
       <a href="#bot"><span class="bar"></span>Bot demo</a>
+      <a href="#projects"><span class="bar"></span>Projects</a>
+      <a href="#safety"><span class="bar"></span>How I build</a>
+      <a href="#roi"><span class="bar"></span>ROI estimator</a>
+      <a href="#work"><span class="bar"></span>Experience</a>
       <a href="#stack"><span class="bar"></span>Stack</a>
       <a href="#contact"><span class="bar"></span>Contact</a>
     </nav>
@@ -297,9 +296,10 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
       <p class="lead">Backend &amp; .NET engineer with <b>4+ years</b> turning manual, error-prone operations into reliable automated workflows. Most of my production work is private — at <b>Toro Alerts</b> I work across market-data ingestion, SQL analytics, schedulers, internal tools and alert delivery. On the open side I build <b>MCP servers</b> and <b>agent tooling</b>. The throughline: reduce repeated work without losing traceability or control.</p>
     </section>
 
-    <section class="sec reveal" id="automation">
-      <div class="sec-h" data-n="02">Market-data automation demo</div>
-      <p class="lead" style="margin-bottom:18px">A representative market-data automation pipeline based on the kind of workflows I build at Toro Alerts. Hit run — it pulls <b>live US prices from Yahoo Finance when available</b>, filters by liquidity, computes <b>EMA-13, EMA-50 &amp; RSI(14)</b>, applies simple signal rules and ranks the picks. <span style="opacity:.7">If the public source is blocked, the demo switches to marked sample data.</span></p>
+    <section class="sec reveal" id="proof">
+      <span class="flagtag">LIVE WORKING DEMO</span>
+      <div class="sec-h" data-n="02">Featured proof</div>
+      <p class="lead" style="margin-bottom:18px">The strongest proof on this page is the working stock research engine below. It calls a Cloudflare Worker, pulls <b>live US prices from Yahoo Finance when available</b>, filters by liquidity, computes <b>EMA-13, EMA-50 &amp; RSI(14)</b>, applies simple signal rules and ranks the picks. <span style="opacity:.7">If the public source is blocked, the demo switches to marked sample data.</span></p>
       <p class="calc-note">This is a sample stock strategy and isn't financial advice. Live browser requests run in parallel and usually finish in a few seconds; blocked sources fall back to labeled sample data.</p>
       <div class="demo">
         <div class="demo-top"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span style="margin-left:8px">stock-research-engine</span><span class="st" id="status">idle</span></div>
@@ -325,8 +325,39 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
       </div>
     </section>
 
+    <section class="sec reveal" id="case-study">
+      <div class="sec-h" data-n="03">Case study</div>
+      <div class="casebox">
+        <div class="case-top">
+          <div class="k">project note</div>
+          <h3>Requirement Bot</h3>
+          <p>I built this as a practical workflow agent for messy marketplace chats. The idea is not to let a bot spray replies into groups. It listens only to approved channels, pulls out useful buyer requests and listing posts, and prepares a short match draft that a person can review.</p>
+        </div>
+        <div class="casegrid">
+          <div class="caseitem"><div class="h">Problem</div><p>Good requirements disappear quickly in active chats. Someone asks for a car or property, a seller may already have a match, but the operator still has to scroll, copy, search and reply by hand.</p></div>
+          <div class="caseitem"><div class="h">Build</div><p>A TypeScript service handles WhatsApp/Telegram inputs, classifies each message, stores structured listings in SQLite and searches only the sources configured in an allowlist.</p></div>
+          <div class="caseitem"><div class="h">Controls</div><p>Ambiguous messages are pushed to an operator flow. Real credentials, group IDs, QR images, logs and downloaded media are kept out of git, and the public defaults are set for review-first operation.</p></div>
+          <div class="caseitem"><div class="h">Result</div><p>The public repo uses sample data and placeholders, but keeps the real shape: classify, remember, search, rank, and hand a reviewable reply to a human instead of sending blind automation.</p></div>
+        </div>
+        <div class="casefoot">What I would add next: a small review dashboard, per-source rate limits, exportable audit logs and deployment notes for running it safely on a small VPS.</div>
+      </div>
+    </section>
+
+    <section class="sec reveal" id="bot">
+      <div class="featured">
+        <span class="flagtag">SIMULATED WORKFLOW DEMO</span>
+        <div class="sec-h" data-n="04" style="margin-bottom:14px">Requirement Bot — human-reviewed matching flow</div>
+        <p class="lead" style="margin-bottom:18px">A simulated requirement-matching workflow: it detects a buyer request, searches approved sources, ranks matches and prepares a human-reviewable reply. Production use would require consent, rate limits, audit logs and approval controls. Press play for an illustrative run.</p>
+        <div class="chatwrap">
+          <div class="chat-hd"><span class="av">🚗</span><div><div class="nm">Demo Used Cars</div><div class="mt">group · sample data</div></div><span class="live"><span class="d"></span>bot online</span></div>
+          <div class="chat-body" id="chatBody"><div class="hint">▶ press play to watch the bot handle a request</div></div>
+          <div class="chat-foot"><button class="run" id="botPlay">▶ Play demo</button><span class="res-tag" id="botTag" style="margin-left:auto"></span></div>
+        </div>
+      </div>
+    </section>
+
     <section class="sec reveal" id="roi">
-      <div class="sec-h" data-n="03">ROI estimator</div>
+      <div class="sec-h" data-n="05">ROI estimator</div>
       <p class="lead" style="margin-bottom:18px">Most repetitive work hides its true cost. Drag the sliders to model a task your team does by hand — see what automating it gives back.</p>
       <div class="calc">
         <div class="calc-in">
@@ -344,7 +375,7 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
     </section>
 
     <section class="sec reveal" id="work">
-      <div class="sec-h" data-n="04">Experience</div>
+      <div class="sec-h" data-n="06">Experience</div>
       <div class="job">
         <div class="when">APR 2022 — PRESENT · REMOTE</div>
         <h3>Senior Software Engineer</h3><div class="co">Toro Alerts</div>
@@ -364,8 +395,8 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
       </div>
     </section>
 
-    <section class="sec reveal" id="proof">
-      <div class="sec-h" data-n="05">Automation proof</div>
+    <section class="sec reveal" id="proof-systems">
+      <div class="sec-h" data-n="07">Automation proof</div>
       <p class="lead" style="margin-bottom:18px">The pattern I care about is simple: automation that is scheduled, observable, recoverable and still easy for a human to override when the job needs judgment.</p>
       <div class="proofgrid">
         <div class="proof"><h3>Scheduling &amp; retries</h3><p>Recurring job runners, task state tracking, retry-safe alert dispatch and manual reset paths for jobs that cannot silently fail.</p></div>
@@ -376,7 +407,7 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
     </section>
 
     <section class="sec reveal" id="safety">
-      <div class="sec-h" data-n="06">How I build automation</div>
+      <div class="sec-h" data-n="08">How I build automation</div>
       <div class="proofgrid">
         <div class="proof"><h3>Idempotent jobs</h3><p>Tasks track state, inputs and outputs so reruns do not duplicate alerts, messages or trade actions when a worker restarts.</p></div>
         <div class="proof"><h3>Queues &amp; retries</h3><p>Slow or flaky work is moved behind queues, timeouts and retry limits instead of blocking the main workflow.</p></div>
@@ -386,43 +417,12 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
     </section>
 
     <section class="sec reveal" id="projects">
-      <div class="sec-h" data-n="07">Projects</div>
-      <a class="proj" href="https://github.com/harshwasan/NFTY-MCP"><div class="k">OPEN SOURCE · MCP</div><h3>NFTY-MCP</h3><p>MCP server for ntfy.sh — push notifications, async agent messaging and human-in-the-loop approval.</p><div class="chips"><span class="chip">MCP</span><span class="chip">ntfy.sh</span><span class="chip">HITL</span></div><span class="cta">View repo ↗</span></a>
-      <a class="proj" href="https://github.com/harshwasan/Web-Agent"><div class="k">OPEN SOURCE · AGENT INFRA</div><h3>Web-Agent</h3><p>Embeddable website-agent widget backed by a user-run local bridge. It lets a site expose approved page actions and context to a local desktop agent runner, with approval flow, backend selection and local-first control.</p><div class="chips"><span class="chip">Agents</span><span class="chip">JavaScript</span><span class="chip">Python bridge</span><span class="chip">approvals</span></div><span class="cta">View repo ↗</span></a>
+      <div class="sec-h" data-n="09">Projects</div>
       <a class="proj" href="https://github.com/harshwasan/requirement-bot"><div class="k">OPEN SOURCE · WORKFLOW AGENT</div><h3>Requirement Bot</h3><p>Human-reviewed marketplace matching agent that classifies chat requirements, stores structured listing memory, searches approved sources and prepares ranked matches for operator approval.</p><div class="chips"><span class="chip">TypeScript</span><span class="chip">LLM workflow</span><span class="chip">SQLite</span><span class="chip">allowlists</span></div><span class="cta">View repo ↗</span></a>
+      <a class="proj" href="https://github.com/harshwasan/Web-Agent"><div class="k">OPEN SOURCE · AGENT INFRA</div><h3>Web-Agent</h3><p>Embeddable website-agent widget backed by a user-run local bridge. It lets a site expose approved page actions and context to a local desktop agent runner, with approval flow, backend selection and local-first control.</p><div class="chips"><span class="chip">Agents</span><span class="chip">JavaScript</span><span class="chip">Python bridge</span><span class="chip">approvals</span></div><span class="cta">View repo ↗</span></a>
+      <a class="proj" href="https://github.com/harshwasan/NFTY-MCP"><div class="k">OPEN SOURCE · MCP</div><h3>NFTY-MCP</h3><p>MCP server for ntfy.sh — push notifications, async agent messaging and human-in-the-loop approval.</p><div class="chips"><span class="chip">MCP</span><span class="chip">ntfy.sh</span><span class="chip">HITL</span></div><span class="cta">View repo ↗</span></a>
       <a class="proj" href="https://github.com/harshwasan/agentvoice"><div class="k">OPEN SOURCE · SPEECH TO TEXT</div><h3>AgentVoice</h3><p>Local Windows push-to-talk dictation that transcribes speech offline with Whisper large-v3 and pastes text at the cursor.</p><div class="chips"><span class="chip">Python</span><span class="chip">Whisper</span><span class="chip">offline</span></div><span class="cta">View repo ↗</span></a>
       <div class="proj" style="cursor:default"><div class="k">PRODUCTION · PRIVATE</div><h3>Social Media Automation Suite</h3><p>Internal multi-platform scheduling and engagement-analysis tooling with AI-assisted workflow support.</p><div class="chips"><span class="chip">C#</span><span class="chip">AI APIs</span><span class="chip">internal</span></div></div>
-    </section>
-
-    <section class="sec reveal" id="case-study">
-      <div class="sec-h" data-n="08">Case study</div>
-      <div class="casebox">
-        <div class="case-top">
-          <div class="k">project note</div>
-          <h3>Requirement Bot</h3>
-          <p>I built this as a practical workflow agent for messy marketplace chats. The idea is not to let a bot spray replies into groups. It listens only to approved channels, pulls out useful buyer requests and listing posts, and prepares a short match draft that a person can review.</p>
-        </div>
-        <div class="casegrid">
-          <div class="caseitem"><div class="h">Problem</div><p>Good requirements disappear quickly in active chats. Someone asks for a car or property, a seller may already have a match, but the operator still has to scroll, copy, search and reply by hand.</p></div>
-          <div class="caseitem"><div class="h">Build</div><p>A TypeScript service handles WhatsApp/Telegram inputs, classifies each message, stores structured listings in SQLite and searches only the sources configured in an allowlist.</p></div>
-          <div class="caseitem"><div class="h">Controls</div><p>Ambiguous messages are pushed to an operator flow. Real credentials, group IDs, QR images, logs and downloaded media are kept out of git, and the public defaults are set for review-first operation.</p></div>
-          <div class="caseitem"><div class="h">Result</div><p>The public repo uses sample data and placeholders, but keeps the real shape: classify, remember, search, rank, and hand a reviewable reply to a human instead of sending blind automation.</p></div>
-        </div>
-        <div class="casefoot">What I would add next: a small review dashboard, per-source rate limits, exportable audit logs and deployment notes for running it safely on a small VPS.</div>
-      </div>
-    </section>
-
-    <section class="sec reveal" id="bot">
-      <div class="featured">
-        <span class="flagtag">▶ simulated workflow demo</span>
-        <div class="sec-h" data-n="09" style="margin-bottom:14px">Requirement Bot — human-reviewed matching flow</div>
-        <p class="lead" style="margin-bottom:18px">A simulated requirement-matching workflow: it detects a buyer request, searches approved sources, ranks matches and prepares a human-reviewable reply. Production use would require consent, rate limits, audit logs and approval controls. Press play for an illustrative run.</p>
-        <div class="chatwrap">
-          <div class="chat-hd"><span class="av">🚗</span><div><div class="nm">Demo Used Cars</div><div class="mt">group · sample data</div></div><span class="live"><span class="d"></span>bot online</span></div>
-          <div class="chat-body" id="chatBody"><div class="hint">▶ press play to watch the bot handle a request</div></div>
-          <div class="chat-foot"><button class="run" id="botPlay">▶ Play demo</button><span class="res-tag" id="botTag" style="margin-left:auto"></span></div>
-        </div>
-      </div>
     </section>
 
     <section class="sec reveal" id="stack">
