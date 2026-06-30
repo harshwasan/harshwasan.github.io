@@ -171,7 +171,8 @@ table.eng tr.rej td{opacity:.32}table.eng tr.rej td:nth-child(-n+2){text-decorat
 .ch-h{display:flex;justify-content:space-between;align-items:baseline}
 .ch-h .lbl{font-family:var(--disp);font-weight:700;font-size:16px;color:var(--hi)}.ch-h .meta{font-family:var(--mono);font-size:10.5px;color:var(--mut)}
 .chartbox canvas{width:100%;height:130px;margin-top:10px}
-.mc{font-family:var(--mono);font-size:11.5px;color:var(--mut);margin-top:12px;border-top:1px solid var(--line);padding-top:11px;min-height:54px;line-height:1.65}
+.mc{font-family:var(--mono);font-size:11.5px;color:var(--mut);margin-top:12px;border-top:1px solid var(--line);padding-top:11px;min-height:92px;max-height:150px;overflow:auto;line-height:1.65}
+.mc .ln{display:block}
 .mc .ok{color:var(--acc)}.mc .w{color:#facc88}.mc .i{color:var(--acc2)}
 .runbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;border-top:1px solid var(--line)}
 .actions{display:flex;gap:10px;align-items:center;min-width:0}
@@ -299,7 +300,7 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--mut);padding:24px 0 
     <section class="sec reveal" id="automation">
       <div class="sec-h" data-n="02">Market-data automation demo</div>
       <p class="lead" style="margin-bottom:18px">A representative market-data automation pipeline based on the kind of workflows I build at Toro Alerts. Hit run — it pulls <b>live US prices from Yahoo Finance when available</b>, filters by liquidity, computes <b>EMA-13, EMA-50 &amp; RSI(14)</b>, applies simple signal rules and ranks the picks. <span style="opacity:.7">If the public source is blocked, the demo switches to marked sample data.</span></p>
-      <p class="calc-note">This is a sample stock strategy and isn't financial advice.</p>
+      <p class="calc-note">This is a sample stock strategy and isn't financial advice. Live browser requests run in parallel and usually finish in a few seconds; blocked sources fall back to labeled sample data.</p>
       <div class="demo">
         <div class="demo-top"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span style="margin-left:8px">stock-research-engine</span><span class="st" id="status">idle</span></div>
         <div class="stages" id="stages">
@@ -495,17 +496,20 @@ const UNIVERSE=[
  {s:'INTC',base:24,drift:-0.26,volat:2.9,seed:71,volM:45},{s:'RIVN',base:13,drift:-0.22,volat:3.6,seed:83,volM:30},
  {s:'LCID',base:3.1,drift:-0.16,volat:3.2,seed:97,volM:45}
 ];
+const NAMES={NVDA:'NVIDIA',AAPL:'Apple',MSFT:'Microsoft',TSLA:'Tesla',AMZN:'Amazon',META:'Meta',INTC:'Intel',RIVN:'Rivian',LCID:'Lucid'};
 async function fetchYahoo(sym){
   const y='https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'?range=3mo&interval=1d';
   const urls=['https://api.allorigins.win/raw?url='+encodeURIComponent(y),'https://corsproxy.io/?url='+encodeURIComponent(y),y];
-  for(const u of urls){try{
-    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),6500);
-    const res=await fetch(u,{signal:ctl.signal,cache:'no-store'});clearTimeout(to);if(!res.ok)continue;
-    const j=await res.json(),r=j&&j.chart&&j.chart.result&&j.chart.result[0];if(!r)continue;
+  const read=async u=>{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),4200);
+    try{
+    const res=await fetch(u,{signal:ctl.signal,cache:'no-store'});if(!res.ok)throw Error('bad response');
+    const j=await res.json(),r=j&&j.chart&&j.chart.result&&j.chart.result[0];if(!r)throw Error('missing chart');
     const q=r.indicator.quote[0];const closes=(q.close||[]).filter(x=>x!=null);const vols=(q.volume||[]).filter(x=>x!=null);
-    if(closes.length<50)continue;const last=(r.meta&&r.meta.regularMarketPrice)||closes[closes.length-1];
+    if(closes.length<50)throw Error('short series');const last=(r.meta&&r.meta.regularMarketPrice)||closes[closes.length-1];
     const avgVol=vols.length?vols.reduce((a,b)=>a+b,0)/vols.length:0;return{closes:closes.slice(-60),last,avgVol,live:true};
-  }catch(e){}}return null;
+    }finally{clearTimeout(to);}
+  };
+  try{return await Promise.any(urls.map(read));}catch(e){return null;}
 }
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function buildFallback(st){const rng=mulberry32(st.seed),out=[st.base];for(let i=1;i<60;i++){const noise=(rng()-0.5)*2*st.volat/100;out.push(+(out[i-1]*(1+st.drift/100+noise)).toFixed(2));}return{closes:out,last:out[out.length-1],avgVol:st.volM*1e6,live:false};}
@@ -515,7 +519,10 @@ function metrics(p){return{last:p[p.length-1],ema13:ema(p,13),ema50:ema(p,50),rs
 function signal(m){const up=m.ema13>m.ema50,spread=(m.ema13-m.ema50)/m.ema50*100;if(up&&m.rsi<70)return{label:'BUY',cls:'buy',score:spread+(70-m.rsi)/10};if(!up&&m.rsi>30)return{label:'SELL',cls:'sell',score:spread-(m.rsi-30)/10};return{label:'HOLD',cls:'hold',score:0};}
 const tbody=document.getElementById('tbody'),mcEl=document.getElementById('mc'),statusEl=document.getElementById('status'),runBtn=document.getElementById('runBtn'),clearBtn=document.getElementById('clearBtn'),resTag=document.getElementById('resTag'),stagesEls=[...document.querySelectorAll('.stage')],chLabel=document.getElementById('chLabel'),chMeta=document.getElementById('chMeta');
 let engRunning=false;
-function mc(t,cls){mcEl.innerHTML='<span class="'+(cls||'')+'">'+t+'</span>';}
+let mcLines=[];
+function renderMc(){mcEl.innerHTML=mcLines.map(x=>'<span class="ln '+(x.cls||'')+'">'+x.t+'</span>').join('');mcEl.scrollTop=mcEl.scrollHeight;}
+function mc(t,cls){mcLines=[{t,cls:cls||''}];renderMc();}
+function mcAdd(t,cls){mcLines.push({t,cls:cls||''});if(mcLines.length>20)mcLines.shift();renderMc();}
 function setStage(i,state){const e=stagesEls[i];e.classList.remove('active');if(state==='active')e.classList.add('active');if(state==='done')e.classList.add('done');}
 function resetEngine(){tbody.innerHTML='<tr class="row in"><td colspan="6" style="text-align:center;color:var(--mut);padding:30px">press ▶ Run to pull live data</td></tr>';stagesEls.forEach(e=>e.classList.remove('active','done'));resTag.textContent='';statusEl.textContent='idle';mc('$ pipeline idle — 5 stages ready');chLabel.textContent='Top pick';chMeta.textContent='awaiting run';const cv=document.getElementById('chart');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);}
 clearBtn.onclick=()=>{if(!engRunning)resetEngine();};
@@ -526,27 +533,34 @@ function drawChart(series,color){const cv=document.getElementById('chart');const
 async function runEngine(){
   if(engRunning)return;engRunning=true;runBtn.disabled=true;resTag.textContent='';stagesEls.forEach(e=>e.classList.remove('active','done'));statusEl.textContent='running…';statusEl.style.color='var(--acc)';
   const t0=performance.now();const rows=[],rejected=[];
-  setStage(0,'active');mc('fetching live prices from Yahoo Finance…','i');tbody.innerHTML='';let liveCount=0;
-  for(const st of UNIVERSE){const data=await fetchYahoo(st.s)||buildFallback(st);st.closes=data.closes;st.last=data.last;st.avgVol=data.avgVol;st.live=data.live;if(data.live)liveCount++;
-    const tr=document.createElement('tr');tr.className='row';tr.innerHTML=`<td class="sym">${st.s}</td><td>$${st.last.toFixed(2)}</td><td>—</td><td>—</td><td>—</td><td>—</td>`;tbody.appendChild(tr);requestAnimationFrame(()=>tr.classList.add('in'));rows.push({st,tr});if(!data.live)await sleep(90);}
+  setStage(0,'active');mc('starting parallel Yahoo Finance requests for '+UNIVERSE.length+' symbols…','i');tbody.innerHTML='';let liveCount=0;
+  const fetchJobs=UNIVERSE.map(async st=>{
+    const tr=document.createElement('tr');tr.className='row';tr.innerHTML=`<td class="sym">${st.s}</td><td>fetching…</td><td>—</td><td>—</td><td>—</td><td>—</td>`;tbody.appendChild(tr);requestAnimationFrame(()=>tr.classList.add('in'));
+    mcAdd('↳ fetching live price from Yahoo Finance for '+(NAMES[st.s]||st.s)+' ('+st.s+')…','i');
+    const liveData=await fetchYahoo(st.s),data=liveData||buildFallback(st);st.closes=data.closes;st.last=data.last;st.avgVol=data.avgVol;st.live=data.live;if(data.live)liveCount++;
+    tr.children[1].textContent='$'+st.last.toFixed(2);
+    mcAdd((data.live?'✓ ':'↳ ')+st.s+' '+(data.live?'live price $'+st.last.toFixed(2)+' · '+st.closes.length+' daily closes':'using sample fallback · browser source blocked'),data.live?'ok':'w');
+    return{st,tr};
+  });
+  rows.push(...await Promise.all(fetchJobs));
   const src=liveCount===UNIVERSE.length?'live Yahoo Finance data ✓':liveCount>0?liveCount+'/'+UNIVERSE.length+' live · rest sample':'sample data — Yahoo blocked from here';
-  mc('✓ fetched '+UNIVERSE.length+' symbols · '+src,'ok');setStage(0,'done');await sleep(300);
-  setStage(1,'active');mc('screening avg daily $ volume ≥ $500M…','i');await sleep(350);let kept=[];
-  for(const r of rows){await sleep(120);r.st.dv=r.st.last*r.st.avgVol;if(r.st.dv<5e8){r.tr.classList.add('rej');r.tr.children[5].innerHTML='<span class="sig flt">filtered</span>';rejected.push(r);}else kept.push(r);}
-  mc('✓ '+kept.length+'/'+UNIVERSE.length+' pass'+(rejected.length?' — dropped '+rejected.map(r=>r.st.s).join(', '):''),'ok');setStage(1,'done');await sleep(300);
-  setStage(2,'active');mc('computing EMA-13 · EMA-50 · RSI(14)…','i');await sleep(300);
-  for(const r of kept){r.m=metrics(r.st.closes);await sleep(170);const up=r.m.ema13>=r.m.ema50;const e1=r.tr.children[2];e1.textContent='$'+r.m.ema13.toFixed(2);e1.className=(up?'up':'down')+' cell-pop';r.tr.children[3].textContent='$'+r.m.ema50.toFixed(2);r.tr.children[3].className='cell-pop';const rz=r.tr.children[4];rz.textContent=r.m.rsi.toFixed(0);rz.className=(r.m.rsi>70?'down':r.m.rsi<30?'up':'')+' cell-pop';}
-  mc('✓ EMA-13, EMA-50 & RSI(14) computed for '+kept.length+' stocks','ok');setStage(2,'done');await sleep(350);
-  setStage(3,'active');mc('applying signal rules (EMA trend + RSI)…','i');await sleep(300);
-  for(const r of kept){await sleep(150);r.sig=signal(r.m);r.tr.children[5].innerHTML='<span class="sig '+r.sig.cls+'">'+r.sig.label+'</span>';}
+  mcAdd('✓ fetched '+UNIVERSE.length+' symbols · '+src,'ok');setStage(0,'done');await sleep(180);
+  setStage(1,'active');mcAdd('screening avg daily $ volume ≥ $500M…','i');await sleep(180);let kept=[];
+  for(const r of rows){await sleep(55);r.st.dv=r.st.last*r.st.avgVol;if(r.st.dv<5e8){r.tr.classList.add('rej');r.tr.children[5].innerHTML='<span class="sig flt">filtered</span>';rejected.push(r);mcAdd('↳ '+r.st.s+' filtered: estimated daily dollar volume below threshold','w');}else kept.push(r);}
+  mcAdd('✓ '+kept.length+'/'+UNIVERSE.length+' pass liquidity'+(rejected.length?' · dropped '+rejected.map(r=>r.st.s).join(', '):''),'ok');setStage(1,'done');await sleep(180);
+  setStage(2,'active');mcAdd('computing EMA-13, EMA-50 and RSI(14) for passing symbols…','i');await sleep(180);
+  for(const r of kept){r.m=metrics(r.st.closes);await sleep(80);const up=r.m.ema13>=r.m.ema50;const e1=r.tr.children[2];e1.textContent='$'+r.m.ema13.toFixed(2);e1.className=(up?'up':'down')+' cell-pop';r.tr.children[3].textContent='$'+r.m.ema50.toFixed(2);r.tr.children[3].className='cell-pop';const rz=r.tr.children[4];rz.textContent=r.m.rsi.toFixed(0);rz.className=(r.m.rsi>70?'down':r.m.rsi<30?'up':'')+' cell-pop';mcAdd('↳ '+r.st.s+' EMA13 $'+r.m.ema13.toFixed(2)+' · EMA50 $'+r.m.ema50.toFixed(2)+' · RSI '+r.m.rsi.toFixed(0),'i');}
+  mcAdd('✓ indicators computed for '+kept.length+' stocks','ok');setStage(2,'done');await sleep(180);
+  setStage(3,'active');mcAdd('applying signal rules: EMA trend plus RSI guardrails…','i');await sleep(180);
+  for(const r of kept){await sleep(70);r.sig=signal(r.m);r.tr.children[5].innerHTML='<span class="sig '+r.sig.cls+'">'+r.sig.label+'</span>';mcAdd('↳ '+r.st.s+' signal: '+r.sig.label,'i');}
   const buys=kept.filter(r=>r.sig.cls==='buy').length,sells=kept.filter(r=>r.sig.cls==='sell').length;
-  mc('✓ signals: '+buys+' BUY · '+sells+' SELL · '+(kept.length-buys-sells)+' HOLD','ok');setStage(3,'done');await sleep(350);
-  setStage(4,'active');mc('ranking by signal strength…','i');await sleep(350);
+  mcAdd('✓ signals: '+buys+' BUY · '+sells+' SELL · '+(kept.length-buys-sells)+' HOLD','ok');setStage(3,'done');await sleep(180);
+  setStage(4,'active');mcAdd('ranking by signal strength…','i');await sleep(180);
   kept.sort((a,b)=>b.sig.score-a.sig.score);kept.forEach((r,i)=>{r.tr.classList.toggle('top',i===0);tbody.appendChild(r.tr);});rejected.forEach(r=>tbody.appendChild(r.tr));
   const top=kept[0];const color=getComputedStyle(document.documentElement).getPropertyValue('--acc').trim();drawChart(top.st.closes,color);
   chLabel.textContent='🏆 '+top.st.s;chMeta.textContent=top.sig.label+' · EMA13 '+(top.m.ema13>top.m.ema50?'>':'<')+' EMA50 · RSI '+top.m.rsi.toFixed(0);
   setStage(4,'done');const ms=(performance.now()-t0).toFixed(0);
-  mc('✓ pipeline complete in '+ms+'ms — top pick <b>'+top.st.s+'</b> ('+top.sig.label+').','ok');
+  mcAdd('✓ pipeline complete in '+ms+'ms — top pick <b>'+top.st.s+'</b> ('+top.sig.label+').','ok');
   statusEl.textContent='done';statusEl.style.color='var(--mut)';resTag.textContent='● '+top.st.s+' '+top.sig.label;resTag.style.color='var(--acc)';engRunning=false;runBtn.disabled=false;
 }
 runBtn.onclick=runEngine;
